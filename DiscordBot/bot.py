@@ -9,6 +9,7 @@ import requests
 from report import Report
 import pdb
 import asyncio
+import re
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -30,6 +31,7 @@ with open(token_path) as f:
 class ModBot(discord.Client):
     def __init__(self): 
         intents = discord.Intents.default()
+        intents.message_content = True
         intents.messages = True
         super().__init__(command_prefix='.', intents=intents)
         self.group_num = None
@@ -207,9 +209,11 @@ class ModBot(discord.Client):
             #print("From bot:", message.content)
             return
 
-        print(message)
+        if self.search_links(message.content) == False:
+            await message.channel.send("The message above may contain links that may lead to phishing websites, as non-English characters were detected. Please proceed with caution.")
 
-        print("From", message.author.id, ":", message.content)
+        
+        #print("From", message.author.id, ":", message.content)
 
         # Check if this message was sent in a server ("guild") or if it's a DM
         if message.guild:
@@ -254,6 +258,13 @@ class ModBot(discord.Client):
         # Only handle messages sent in the "group-#" channel
         if not message.channel.name == f'group-{self.group_num}':
             return
+        
+        mod_channel = self.mod_channels[message.guild.id]
+        await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
+        #scores = self.eval_text(message.content)
+        #await mod_channel.send(self.code_format(scores))
+        return 
+        
     
     async def have_mutual_guilds_or_friends(self, user_id, other_id):
         user = await self.fetch_user(user_id)
@@ -316,6 +327,40 @@ class ModBot(discord.Client):
         insert your code here! This will primarily be used in Milestone 3. 
         '''
         return message
+    
+    # Looks for links within the message
+    def search_links(self, message):
+        #print("checking for a link")
+        regex = r"^(?:(?:http|https)://)?((?:[A-ZА-ЯЁ0-9-α-ωΑ-Ω](?:[A-ZА-ЯЁ0-9-α-ωΑ-Ω]{0,61}[A-ZА-ЯЁ0-9-α-ωΑ-Ω])?\.)+(?:[A-ZА-ЯЁ0-9-α-ωΑ-Ω]{2,6}\.?|[A-ZА-ЯЁ0-9-α-ωΑ-Ω]{2,}(?<!-)\.?))(?:/?|[/?]\S+)$"
+        
+        urls = re.findall(regex, message, re.I)
+        print(urls)
+        
+        link_safety = True
+        if len(urls) > 0:
+            print("Detected links", urls)
+            # for all detected links, search for possibl scams
+            link_safety = self.eval_links(urls)
+        
+        return link_safety 
+        
+
+    # rudimetary detection method
+    def eval_links(self, links):
+        safety = True
+
+        for link in links:
+            for char in link:
+                # if english alphabetical, ignore
+                if (char >= 'a' and char <= 'z') or (char >= 'A' and char <= 'Z'):
+                    continue
+                # if char is not a symbol -- must be alt chars
+                elif char not in ":/?#[]@!$&'()*+,;=.":
+                    safety = False
+                    return safety
+
+        return safety
+
 
     
     def code_format(self, text):
