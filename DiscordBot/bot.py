@@ -311,6 +311,7 @@ class ModBot(discord.Client):
     
     async def check_flag_user(self, author_id):
         dm_entries = self.dm_log[author_id]
+        # question: what if one message contains the whole scam?
         if len(dm_entries) > 3:
             unique_receivers = {receiver_id for _, receiver_id in dm_entries}
 
@@ -326,6 +327,11 @@ class ModBot(discord.Client):
         TODO: Once you know how you want to evaluate messages in your channel, 
         insert your code here! This will primarily be used in Milestone 3. 
         '''
+        # two out of three have to be true for message to be considered for ban 
+            # 1) if the message contains a link, check for phishing (T/F)
+            # 2) if openai moderation returns a high confidence score (Threshold TBD)
+            # 3) if the user statistic log for suspicious activity  (T/F)
+        
         return message
     
     # Looks for links within the message
