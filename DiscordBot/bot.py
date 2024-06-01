@@ -10,6 +10,7 @@ from report import Report
 import pdb
 import asyncio
 import re
+import openai
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -19,7 +20,8 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(me
 logger.addHandler(handler)
 
 # There should be a file called 'tokens.json' inside the same folder as this file
-token_path = 'DiscordBot/tokens.json'
+# token_path = './tokens.json'
+token_path = 'tokens.json'
 if not os.path.isfile(token_path):
     raise Exception(f"{token_path} not found!")
 with open(token_path) as f:
@@ -197,8 +199,30 @@ class ModBot(discord.Client):
 
             else:
                 await mod_channel.send("This report is marked as a false report -- no action was taken. ")
-            
 
+    async def call_openai_moderation(self, message_content):
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY environment variable not set")
+            # client = openai.OpenAI()
+            client = openai.AsyncClient(api_key=api_key)
+
+            try:
+                response = await client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": "You are an AI content moderator specialized in identifying pig butchering scams. Identify if the following message is a pig butchering scam. Give a confidence score between 0 and 1."},
+                        {"role": "user", "content": message_content}
+                    ], 
+                    temperature=0.0,
+                )
+                print("response: ", response)
+                moderation_result = response.choices[0].message.content
+                return moderation_result
+            except Exception as e:
+                print(f"Error calling OpenAI API: {e}")
+                return "Error in moderation"
+            
     async def on_message(self, message):
         '''
         This function is called whenever a message is sent in a channel that the bot can see (including DMs). 
@@ -220,6 +244,13 @@ class ModBot(discord.Client):
             await self.handle_channel_message(message)
         else:
             await self.handle_dm(message)
+
+        # Call OpenAI moderation
+        print("Calling OpenAI moderation with message:", message.content)   
+        mod_channel = self.mod_channels[message.guild.id]
+        moderation_result = await self.call_openai_moderation(message.content)
+        await mod_channel.send(f'Moderation result:\n{moderation_result}')
+
 
     async def handle_dm(self, message):
         # Handle a help message
