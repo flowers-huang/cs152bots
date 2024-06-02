@@ -218,7 +218,9 @@ class ModBot(discord.Client):
                 )
                 print("response: ", response)
                 moderation_result = response.choices[0].message.content
-                return moderation_result
+                # parse out the confidence score
+                confidence_score = re.findall(r'[0-1]\.[0-9]' ,moderation_result)[0]
+                return [confidence_score, moderation_result]
             except Exception as e:
                 print(f"Error calling OpenAI API: {e}")
                 return "Error in moderation"
@@ -248,7 +250,7 @@ class ModBot(discord.Client):
         # Call OpenAI moderation
         print("Calling OpenAI moderation with message:", message.content)   
         mod_channel = self.mod_channels[message.guild.id]
-        moderation_result = await self.call_openai_moderation(message.content)
+        moderation_result = await self.call_openai_moderation(message.content)[1]
         await mod_channel.send(f'Moderation result:\n{moderation_result}')
 
 
