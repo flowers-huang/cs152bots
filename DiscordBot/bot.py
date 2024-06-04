@@ -216,7 +216,6 @@ class ModBot(discord.Client):
                     ], 
                     temperature=0.0,
                 )
-                # print("response: ", response)
                 moderation_result = response.choices[0].message.content
                 # parse out the confidence score
                 confidence_score = re.findall(r'[0-1]\.[0-9]' ,moderation_result)[0]
@@ -293,9 +292,7 @@ class ModBot(discord.Client):
 
 
         # Call OpenAI moderation
-        print("Calling OpenAI moderation with message:", message.content) 
         moderation_result = await self.call_openai_moderation(message.content)
-        # print("Moderation result:", moderation_result[0])
         if float(moderation_result[0]) >= float(0.6):
             await mod_channel.send("Please review the message for potential scam content.")
             await mod_channel.send(f'Message flagged by gpt-4o:\n{message.content}')
@@ -303,15 +300,6 @@ class ModBot(discord.Client):
 
         return
 
-        # mod_channel = self.mod_channels[message.guild.id]
-        # moderation_result = await self.call_openai_moderation(message.content)
-        # print("Moderation result:", moderation_result)
-        # if float(moderation_result[0]) >= float(0.6):
-        #     await mod_channel.send("Please review the message for potential scam content.")
-        #     await mod_channel.send(f'Message flagged by gpt-4o:\n{message.content}')
-        #     await mod_channel.send(f'Moderation result:\n{moderation_result}')
-        # return 
-        
     
     async def have_mutual_guilds_or_friends(self, user_id, other_id):
         user = await self.fetch_user(user_id)
