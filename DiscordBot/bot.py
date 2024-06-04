@@ -216,7 +216,7 @@ class ModBot(discord.Client):
                     ], 
                     temperature=0.0,
                 )
-                print("response: ", response)
+                # print("response: ", response)
                 moderation_result = response.choices[0].message.content
                 # parse out the confidence score
                 confidence_score = re.findall(r'[0-1]\.[0-9]' ,moderation_result)[0]
@@ -246,12 +246,6 @@ class ModBot(discord.Client):
             await self.handle_channel_message(message)
         else:
             await self.handle_dm(message)
-
-        # Call OpenAI moderation
-        print("Calling OpenAI moderation with message:", message.content)   
-        mod_channel = self.mod_channels[message.guild.id]
-        moderation_result = await self.call_openai_moderation(message.content)[1]
-        await mod_channel.send(f'Moderation result:\n{moderation_result}')
 
 
     async def handle_dm(self, message):
@@ -296,7 +290,27 @@ class ModBot(discord.Client):
         await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
         #scores = self.eval_text(message.content)
         #await mod_channel.send(self.code_format(scores))
-        return 
+
+
+        # Call OpenAI moderation
+        print("Calling OpenAI moderation with message:", message.content) 
+        moderation_result = await self.call_openai_moderation(message.content)
+        # print("Moderation result:", moderation_result[0])
+        if float(moderation_result[0]) >= float(0.6):
+            await mod_channel.send("Please review the message for potential scam content.")
+            await mod_channel.send(f'Message flagged by gpt-4o:\n{message.content}')
+            await mod_channel.send(f'Moderation result:\n{moderation_result[1]}')
+
+        return
+
+        # mod_channel = self.mod_channels[message.guild.id]
+        # moderation_result = await self.call_openai_moderation(message.content)
+        # print("Moderation result:", moderation_result)
+        # if float(moderation_result[0]) >= float(0.6):
+        #     await mod_channel.send("Please review the message for potential scam content.")
+        #     await mod_channel.send(f'Message flagged by gpt-4o:\n{message.content}')
+        #     await mod_channel.send(f'Moderation result:\n{moderation_result}')
+        # return 
         
     
     async def have_mutual_guilds_or_friends(self, user_id, other_id):
@@ -360,11 +374,7 @@ class ModBot(discord.Client):
         TODO: Once you know how you want to evaluate messages in your channel, 
         insert your code here! This will primarily be used in Milestone 3. 
         '''
-        # two out of three have to be true for message to be considered for ban 
-            # 1) if the message contains a link, check for phishing (T/F)
-            # 2) if openai moderation returns a high confidence score (Threshold TBD)
-            # 3) if the user statistic log for suspicious activity  (T/F)
-        
+        #handled through other functions in the code 
         return message
     
     # Looks for links within the message
