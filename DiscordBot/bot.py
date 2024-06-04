@@ -246,6 +246,8 @@ class ModBot(discord.Client):
         else:
             await self.handle_dm(message)
 
+        await self.eval_text(message)
+        return 
 
     async def handle_dm(self, message):
         # Handle a help message
@@ -293,11 +295,15 @@ class ModBot(discord.Client):
 
         # Call OpenAI moderation
         moderation_result = await self.call_openai_moderation(message.content)
+        if moderation_result == "Error in moderation":
+            return
         if float(moderation_result[0]) >= float(0.6):
-            await mod_channel.send("Please review the message for potential scam content.")
-            await mod_channel.send(f'Message flagged by gpt-4o:\n{message.content}')
-            await mod_channel.send(f'Moderation result:\n{moderation_result[1]}')
+            await self.notify_moderation(message, moderation_result[1], "potential scam content")
 
+            # await mod_channel.send("Please review the message for potential scam content.")
+            # await mod_channel.send(f'Message flagged by gpt-4o:\n{message.content}')
+            # await mod_channel.send(f'Moderation result:\n{moderation_result[1]}')
+        # maybe call this function instead notify_moderation_crypto()
         return
 
     
@@ -346,7 +352,6 @@ class ModBot(discord.Client):
     
     async def check_flag_user(self, author_id):
         dm_entries = self.dm_log[author_id]
-        # question: what if one message contains the whole scam?
         if len(dm_entries) > 3:
             unique_receivers = {receiver_id for _, receiver_id in dm_entries}
 
@@ -357,14 +362,47 @@ class ModBot(discord.Client):
                         break
 
     
-    def eval_text(self, message):
+    async def eval_text(self, message):
         ''''
-        TODO: Once you know how you want to evaluate messages in your channel, 
-        insert your code here! This will primarily be used in Milestone 3. 
+        If an incoming message passes a 2/3 threshold for the following checks, the user will be deactivated and their message will be deleted. Moderation will be notified. 
         '''
-        #handled through other functions in the code 
-        return message
+        counter = 0
+
+        # LINK SAFETY
+        link_safety = self.search_links(message.content)
+        # print("Link safety: ", link_safety)
+        if link_safety == False:
+            counter += 1
+
+        # OPENAI MODERATION 
+        moderation_result = await self.call_openai_moderation(message.content)
+        # print("Moderation result: ", moderation_result)
+        if moderation_result != "Error in moderation":
+            if float(moderation_result[0]) >= float(0.6):
+                # print("Message flagged by gpt-4o")
+                counter += 1
+
+        # FLAGGING USER
+        author = message.author
+        with open("./reported_users.txt", "r") as file: # append mode
+            reported_users = file.read()
+            if str(author) in reported_users:
+                # print(f"User ({author}) has been reported before.")
+                counter += 1
     
+        # If the user passes 2/3 checks, they will be deactivated
+        mod_channel = self.mod_channels[message.guild.id]
+        # print("Counter: ", counter)
+        # print("checking for deactivation")
+        if counter >= 2:
+            await mod_channel.send(f"User {author}, id: ({author.id}), has been deactivated for passing automated review process.")
+            await client.delete_reported_message(message)
+            with open("./banned_users.txt", "a") as file:
+                file.write(f"{author}\n")
+                # print(f"User {author} has been added to the banned users list.")
+
+        return 
+
     # Looks for links within the message
     def search_links(self, message):
         #print("checking for a link")
